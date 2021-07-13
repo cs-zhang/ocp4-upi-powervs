@@ -20,7 +20,7 @@
 
 locals {
   bastion_count = lookup(var.bastion, "count", 1)
-  name_prefix = "${var.cluster_id}${var.name_prefix}"
+  name_prefix   = "${var.cluster_id}${var.name_prefix}"
   proxy = {
     server    = lookup(var.proxy, "server", ""),
     port      = lookup(var.proxy, "port", "3128"),
