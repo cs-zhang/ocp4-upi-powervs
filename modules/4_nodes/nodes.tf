@@ -17,6 +17,9 @@
 # limitations under the License.
 #
 ################################################################
+locals {
+  name_prefix = "${var.cluster_id}${var.name_prefix}"
+}
 
 data "ibm_pi_network" "network" {
   pi_network_name      = var.network_name
@@ -42,7 +45,7 @@ data "ignition_file" "b_hostname" {
   path      = "/etc/hostname"
   content {
     content = <<EOF
-${var.name_prefix}-bootstrap
+bootstrap${var.name_prefix}
 EOF
   }
 }
@@ -53,7 +56,7 @@ resource "ibm_pi_instance" "bootstrap" {
 
   pi_memory            = var.bootstrap["memory"]
   pi_processors        = var.bootstrap["processors"]
-  pi_instance_name     = "${var.name_prefix}-bootstrap"
+  pi_instance_name     = "${local.name_prefix}-bootstrap"
   pi_proc_type         = var.processor_type
   pi_image_id          = data.ibm_pi_image.rhcos.id
   pi_sys_type          = var.system_type
@@ -64,7 +67,7 @@ resource "ibm_pi_instance" "bootstrap" {
   pi_user_data = base64encode(replace(data.ignition_config.bootstrap.rendered, "\"timeouts\":{}", "\"timeouts\":{\"httpTotal\":500}"))
 
   # Not needed by RHCOS but required by resource
-  pi_key_pair_name = "${var.name_prefix}-keypair"
+  pi_key_pair_name = "${local.name_prefix}-keypair"
   pi_health_status = "WARNING"
 }
 
@@ -84,7 +87,7 @@ data "ignition_file" "m_hostname" {
   path      = "/etc/hostname"
   content {
     content = <<EOF
-${var.name_prefix}-master-${count.index}
+master-${count.index}${var.name_prefix}
 EOF
   }
 }
@@ -94,7 +97,7 @@ resource "ibm_pi_instance" "master" {
 
   pi_memory            = var.master["memory"]
   pi_processors        = var.master["processors"]
-  pi_instance_name     = "${var.name_prefix}-master-${count.index}"
+  pi_instance_name     = "${local.name_prefix}-master-${count.index}"
   pi_proc_type         = var.processor_type
   pi_image_id          = data.ibm_pi_image.rhcos.id
   pi_sys_type          = var.system_type
@@ -106,7 +109,7 @@ resource "ibm_pi_instance" "master" {
   pi_user_data = base64encode(replace(data.ignition_config.master[count.index].rendered, "\"timeouts\":{}", "\"timeouts\":{\"httpTotal\":500}"))
 
   # Not needed by RHCOS but required by resource
-  pi_key_pair_name = "${var.name_prefix}-keypair"
+  pi_key_pair_name = "${local.name_prefix}-keypair"
   pi_health_status = "WARNING"
 }
 
@@ -114,7 +117,7 @@ resource "ibm_pi_volume" "master" {
   count = var.master_volume_size == "" ? 0 : var.master["count"]
 
   pi_volume_size       = var.master_volume_size
-  pi_volume_name       = "${var.name_prefix}-master-${count.index}-volume"
+  pi_volume_name       = "${local.name_prefix}-master-${count.index}-volume"
   pi_volume_type       = data.ibm_pi_image.rhcos.storage_type
   pi_volume_shareable  = var.volume_shareable
   pi_cloud_instance_id = var.service_instance_id
@@ -130,7 +133,7 @@ data "ignition_file" "w_hostname" {
 
   content {
     content = <<EOF
-${var.name_prefix}-worker-${count.index}
+worker-${count.index}${var.name_prefix}
 EOF
   }
 }
@@ -148,7 +151,7 @@ resource "ibm_pi_instance" "worker" {
 
   pi_memory            = var.worker["memory"]
   pi_processors        = var.worker["processors"]
-  pi_instance_name     = "${var.name_prefix}-worker-${count.index}"
+  pi_instance_name     = "${local.name_prefix}-worker-${count.index}"
   pi_proc_type         = var.processor_type
   pi_image_id          = data.ibm_pi_image.rhcos.id
   pi_sys_type          = var.system_type
@@ -160,7 +163,7 @@ resource "ibm_pi_instance" "worker" {
   pi_user_data = base64encode(replace(data.ignition_config.worker[count.index].rendered, "\"timeouts\":{}", "\"timeouts\":{\"httpTotal\":500}"))
 
   # Not needed by RHCOS but required by resource
-  pi_key_pair_name = "${var.name_prefix}-keypair"
+  pi_key_pair_name = "${local.name_prefix}-keypair"
   pi_health_status = "WARNING"
 }
 
@@ -172,6 +175,7 @@ resource "null_resource" "remove_worker" {
     rhel_username = var.rhel_username
     private_key   = var.private_key
     ssh_agent     = var.ssh_agent
+    name_prefix   = var.name_prefix
   }
 
   provisioner "remote-exec" {
@@ -186,9 +190,9 @@ resource "null_resource" "remove_worker" {
     when       = destroy
     on_failure = continue
     inline = [<<EOF
-oc adm cordon worker-${count.index}
-oc adm drain worker-${count.index} --force --delete-local-data --ignore-daemonsets --timeout=180s
-oc delete node worker-${count.index}
+oc adm cordon worker${self.triggers.name_prefix}-${count.index}
+oc adm drain worker${self.triggers.name_prefix}-${count.index} --force --delete-local-data --ignore-daemonsets --timeout=180s
+oc delete node worker${self.triggers.name_prefix}-${count.index}
 EOF
     ]
   }
@@ -198,7 +202,7 @@ resource "ibm_pi_volume" "worker" {
   count = var.worker_volume_size == "" ? 0 : var.worker["count"]
 
   pi_volume_size       = var.worker_volume_size
-  pi_volume_name       = "${var.name_prefix}-worker-${count.index}-volume"
+  pi_volume_name       = "${local.name_prefix}-worker-${count.index}-volume"
   pi_volume_type       = data.ibm_pi_image.rhcos.storage_type
   pi_volume_shareable  = var.volume_shareable
   pi_cloud_instance_id = var.service_instance_id

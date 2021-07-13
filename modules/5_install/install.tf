@@ -19,6 +19,7 @@
 ################################################################
 
 locals {
+  name_prefix = "${var.cluster_id}${var.name_prefix}"
 
   public_vrrp = {
     virtual_router_id = var.bastion_internal_vip == "" ? "" : split(".", var.bastion_internal_vip)[3]
@@ -41,7 +42,7 @@ locals {
     cluster_domain        = local.cluster_domain
     cluster_id            = var.cluster_id
     bastion_ip            = var.bastion_vip != "" ? var.bastion_vip : var.bastion_ip[0]
-    bastion_name          = var.bastion_vip != "" ? "${var.name_prefix}-bastion" : "${var.name_prefix}-bastion-0"
+    bastion_name          = var.bastion_vip != "" ? "${local.name_prefix}-bastion" : "${local.name_prefix}-bastion-0"
     isHA                  = var.bastion_vip != ""
     bastion_master_ip     = var.bastion_ip[0]
     bastion_backup_ip     = length(var.bastion_ip) > 1 ? slice(var.bastion_ip, 1, length(var.bastion_ip)) : []
@@ -57,20 +58,20 @@ locals {
     bootstrap_info = {
       ip   = var.bootstrap_ip
       mac  = var.bootstrap_mac
-      name = "${var.name_prefix}-bootstrap"
+      name = "bootstrap${var.name_prefix}"
     }
     master_info = [for ix in range(length(var.master_ips)) :
       {
         ip   = var.master_ips[ix],
         mac  = var.master_macs[ix],
-        name = "${var.name_prefix}-master-${ix}"
+        name = "master-${ix}${var.name_prefix}"
       }
     ]
     worker_info = [for ix in range(length(var.worker_ips)) :
       {
         ip   = var.worker_ips[ix],
         mac  = var.worker_macs[ix],
-        name = "${var.name_prefix}-worker-${ix}"
+        name = "worker-${ix}${var.name_prefix}"
       }
     ]
 
@@ -84,10 +85,10 @@ locals {
   }
 
   install_inventory = {
-    bastion_hosts  = [for ix in range(length(var.bastion_ip)) : "${var.name_prefix}-bastion-${ix}"]
-    bootstrap_host = var.bootstrap_ip == "" ? "" : "${var.name_prefix}-bootstrap"
-    master_hosts   = [for ix in range(length(var.master_ips)) : "${var.name_prefix}-master-${ix}"]
-    worker_hosts   = [for ix in range(length(var.worker_ips)) : "${var.name_prefix}-worker-${ix}"]
+    bastion_hosts  = [for ix in range(length(var.bastion_ip)) : "${local.name_prefix}-bastion-${ix}"]
+    bootstrap_host = var.bootstrap_ip == "" ? "" : "bootstrap${var.name_prefix}"
+    master_hosts   = [for ix in range(length(var.master_ips)) : "master-${ix}${var.name_prefix}"]
+    worker_hosts   = [for ix in range(length(var.worker_ips)) : "worker-${ix}${var.name_prefix}"]
   }
 
   proxy = {
